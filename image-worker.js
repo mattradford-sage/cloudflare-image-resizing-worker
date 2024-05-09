@@ -1,17 +1,14 @@
 /**
  * Worker Name: CloudFlare Image Resizing
  * Worker URI: https://github.com/Mecanik/cloudflare-image-resizing-worker
- * Description: This worker will replace Image URLs so you can use the CloudFlare Image Resizing service.
- * Version: 2.0.0
- * Author: Mecanik
+ * Description: This worker will replace Image URLs using the CloudFlare Image Resizing service.
+ * Version: 2.1.0
+ * Author: Mecanik, Sage
  * Author URI: https://github.com/Mecanik/
  *
  * License: Apache License 2.0 (https://github.com/Mecanik/cloudflare-image-resizing-worker/blob/main/LICENSE)
  * Copyright (c) 2023 Mecanik
  **/
-
-// Edit the below as needed
-// START EDIT -----------------------------------------------------
 
 /**
  * Multi-site support using the same Worker.
@@ -29,10 +26,6 @@ const SITES_CONFIG = [
 	*/
     // Add more as needed
 ];
-
-// END EDIT -------------------------------------------------------
-// DO NOT EDIT BELOW THIS LINE. JUST STOP.
-// IF YOU NEED ASSISTANCE, BOOK A CONSULTATION: https://mecanik.dev/en/consulting/
 
 const DEFAULT_CONFIG = {
 
@@ -103,7 +96,7 @@ const CssSpecial1 = '(?:url\\(\\"?\\\'?(\\/?images\\/.*?\\.(?:jpe?g|gif|png|webp
 const rgxCssSpecial1 = new RegExp(`${CssSpecial1}`, 'g');
 
 /**
- * Rewrites the <img> tags, including source sets, plugins like Revolution Slider and more.
+ * Rewrite <img> tags, including srcset.
  * @author Mecanik
  * @version 2.0.0
  */
@@ -269,258 +262,6 @@ class ImageTagRewriter extends HTMLRewriter {
             }
         }
 
-        // Extra
-        const datasrc = element.getAttribute("data-src");
-
-        if (datasrc && datasrc.indexOf("base64") === -1 && datasrc.indexOf(`/wp-content/`) !== -1 && datasrc.indexOf('/cdn-cgi/image/') === -1) {
-            // Base CDN
-            let CDN = "/cdn-cgi/image/";
-            let width = element.getAttribute("width");
-            let height = element.getAttribute("height");
-            let hasSizes = !!width && !!height;
-
-            // Check if image has sizes set and adjust CDN accordingly
-            CDN += hasSizes ? `width=${width},height=${height},fit=${this.config.IMAGE_FIT},` : '';
-            CDN += this.config.IMAGE_QUALITY ? `quality=${this.config.IMAGE_QUALITY},` : '';
-            CDN += this.config.IMAGE_GRAVITY ? `gravity=${this.config.IMAGE_GRAVITY},` : '';
-            CDN += this.config.IMAGE_SHARPEN ? `sharpen=${this.config.IMAGE_SHARPEN},` : '';
-            CDN += this.config.IMAGE_METADATA ? `metadata=${this.config.IMAGE_METADATA},` : '';
-            CDN += `format=auto,onerror=redirect`;
-
-            let result = datasrc.replace(rgxSrc, `$1${CDN}$2$3`);
-
-            // Remove the sizes from the filename, pointing original image to Cloudflare for cropping
-            if (hasSizes) {
-                result = result.replace(regexWidthAndHeight, `$1`);
-            }
-
-            element.setAttribute("data-src", result);
-        }
-
-        // Extra
-        const datasrcset = element.getAttribute("data-srcset");
-
-        if (datasrcset && datasrcset.indexOf(`/wp-content/`) !== -1 && datasrcset.indexOf('/cdn-cgi/image/') === -1) {
-            // Split the datasrcset value into an array of image descriptors, using regex to split by comma possibly followed by space(s)
-            let descriptors = datasrcset.split(/\s*,\s*/);
-
-            // Iterate through the descriptors and modify each URL
-            descriptors = descriptors.map(descriptor => {
-
-                // Split on whitespace
-                let parts = descriptor.trim().split(/\s+/);
-
-                // If unexpected format, return original descriptor
-                if (parts.length !== 2)
-                    return descriptor;
-
-                // This should return us 2 parts: ["https://....Image-300x200.jpg", "300w"]
-                let url = parts[0];
-                let width = parts[1];
-
-                // Try to extract the width and height from the filename
-                // If we fail, just fall back to the width descriptor
-                let match;
-
-                match = url.match(regexWidthAndHeightInFilename);
-
-                if (match) {
-                    let _width = match[1];
-                    let _height = match[2];
-
-                    // Base CDN
-                    let CDN = "/cdn-cgi/image/";
-                    CDN += `width=${_width},height=${_height},fit=${this.config.IMAGE_FIT},`;
-                    CDN += this.config.IMAGE_QUALITY ? `quality=${this.config.IMAGE_QUALITY},` : '';
-                    CDN += this.config.IMAGE_GRAVITY ? `gravity=${this.config.IMAGE_GRAVITY},` : '';
-                    CDN += this.config.IMAGE_SHARPEN ? `sharpen=${this.config.IMAGE_SHARPEN},` : '';
-                    CDN += this.config.IMAGE_METADATA ? `metadata=${this.config.IMAGE_METADATA},` : '';
-                    CDN += `format=auto,onerror=redirect`;
-
-                    // Insert our CDN URL
-                    url = url.replace(rgxSrc, `$1${CDN}$2$3`);
-
-                    // Remove the sizes from the filename, pointing original image to Cloudflare for cropping
-                    url = url.replace(regexWidthAndHeightInFilename, '');
-                } else {
-                    // Extract width descriptor at the end, if filename did not contain dimensions
-                    match = width.match(regexWidthDescriptor);
-
-                    if (match) {
-                        let _width = match[1];
-
-                        // Base CDN
-                        let CDN = "/cdn-cgi/image/";
-                        CDN += `width=${_width},`;
-                        CDN += this.config.IMAGE_QUALITY ? `quality=${this.config.IMAGE_QUALITY},` : '';
-                        CDN += this.config.IMAGE_GRAVITY ? `gravity=${this.config.IMAGE_GRAVITY},` : '';
-                        CDN += this.config.IMAGE_SHARPEN ? `sharpen=${this.config.IMAGE_SHARPEN},` : '';
-                        CDN += this.config.IMAGE_METADATA ? `metadata=${this.config.IMAGE_METADATA},` : '';
-                        CDN += `format=auto,onerror=redirect`;
-
-                        // Insert our CDN URL
-                        url = url.replace(rgxSrc, `$1${CDN}$2$3`);
-                    } else {
-                        // Well, everything is fucked. But we still point the image to Cloudflare!!!
-
-                        // Base CDN
-                        let CDN = "/cdn-cgi/image/";
-                        CDN += this.config.IMAGE_QUALITY ? `quality=${this.config.IMAGE_QUALITY},` : '';
-                        CDN += this.config.IMAGE_GRAVITY ? `gravity=${this.config.IMAGE_GRAVITY},` : '';
-                        CDN += this.config.IMAGE_SHARPEN ? `sharpen=${this.config.IMAGE_SHARPEN},` : '';
-                        CDN += this.config.IMAGE_METADATA ? `metadata=${this.config.IMAGE_METADATA},` : '';
-                        CDN += `format=auto,onerror=redirect`;
-
-                        // Insert our CDN URL
-                        url = url.replace(rgxSrc, `$1${CDN}$2$3`);
-                    }
-                }
-
-                // Reconstruct the descriptor
-                return `${url} ${width}`;
-            });
-
-            // Join the modified descriptors back into a string
-            let modifiedSrcset = descriptors.join(', ');
-
-            element.setAttribute("data-srcset", modifiedSrcset);
-        }
-
-        // Extra - handle "smart" plugins like Revolution Slider and other bananas
-        const datalazyload = element.getAttribute("data-lazyload");
-
-        if (datalazyload && datalazyload.indexOf("base64") === -1 && datalazyload.indexOf(`/wp-content/`) !== -1 && datalazyload.indexOf('/cdn-cgi/image/') === -1) {
-            // Base CDN
-            let CDN = "/cdn-cgi/image/";
-            let width = element.getAttribute("width");
-            let height = element.getAttribute("height");
-            let hasSizes = !!width && !!height;
-
-            // Check if image has sizes set and adjust CDN accordingly
-            CDN += hasSizes ? `width=${width},height=${height},fit=${this.config.IMAGE_FIT},` : '';
-            CDN += this.config.IMAGE_QUALITY ? `quality=${this.config.IMAGE_QUALITY},` : '';
-            CDN += this.config.IMAGE_GRAVITY ? `gravity=${this.config.IMAGE_GRAVITY},` : '';
-            CDN += this.config.IMAGE_SHARPEN ? `sharpen=${this.config.IMAGE_SHARPEN},` : '';
-            CDN += this.config.IMAGE_METADATA ? `metadata=${this.config.IMAGE_METADATA},` : '';
-            CDN += `format=auto,onerror=redirect`;
-
-            let result = datalazyload.replace(rgxSrc, `$1${CDN}$2$3`);
-
-            element.setAttribute("data-lazyload", result);
-        }
-
-        // Extra - handle "smart" plugins like WP Rocket and other bananas
-        const datalazysrc = element.getAttribute("data-lazy-src");
-
-        if (datalazysrc && datalazysrc.indexOf("base64") === -1 && datalazysrc.indexOf(`/wp-content/`) !== -1 && datalazysrc.indexOf('/cdn-cgi/image/') === -1) {
-            // Base CDN
-            let CDN = "/cdn-cgi/image/";
-            let width = element.getAttribute("width");
-            let height = element.getAttribute("height");
-            let hasSizes = !!width && !!height;
-
-            // Check if image has sizes set and adjust CDN accordingly
-            CDN += hasSizes ? `width=${width},height=${height},fit=${this.config.IMAGE_FIT},` : '';
-            CDN += this.config.IMAGE_QUALITY ? `quality=${this.config.IMAGE_QUALITY},` : '';
-            CDN += this.config.IMAGE_GRAVITY ? `gravity=${this.config.IMAGE_GRAVITY},` : '';
-            CDN += this.config.IMAGE_SHARPEN ? `sharpen=${this.config.IMAGE_SHARPEN},` : '';
-            CDN += this.config.IMAGE_METADATA ? `metadata=${this.config.IMAGE_METADATA},` : '';
-            CDN += `format=auto,onerror=redirect`;
-
-            let result = datalazysrc.replace(rgxSrc, `$1${CDN}$2$3`);
-
-            element.setAttribute("data-lazy-src", result);
-        }
-
-        // Extra - handle "smart" plugins like WP Rocket and other bananas
-        const datalazysrcset = element.getAttribute("data-lazy-srcset");
-
-        if (datalazysrcset && datalazysrcset.indexOf(`/wp-content/`) !== -1 && datalazysrcset.indexOf('/cdn-cgi/image/') === -1) {
-            // Split the srcset value into an array of image descriptors, using regex to split by comma possibly followed by space(s)
-            let descriptors = datalazysrcset.split(/\s*,\s*/);
-
-            // Iterate through the descriptors and modify each URL
-            descriptors = descriptors.map(descriptor => {
-
-                // Split on whitespace
-                let parts = descriptor.trim().split(/\s+/);
-
-                // If unexpected format, return original descriptor
-                if (parts.length !== 2)
-                    return descriptor;
-
-                // This should return us 2 parts: ["https://....Image-300x200.jpg", "300w"]
-                let url = parts[0];
-                let width = parts[1];
-
-                // Try to extract the width and height from the filename
-                // If we fail, just fall back to the width descriptor
-                let match;
-
-                match = url.match(regexWidthAndHeightInFilename);
-
-                if (match) {
-                    let _width = match[1];
-                    let _height = match[2];
-
-                    // Base CDN
-                    let CDN = "/cdn-cgi/image/";
-                    CDN += `width=${_width},height=${_height},fit=${this.config.IMAGE_FIT},`;
-                    CDN += this.config.IMAGE_QUALITY ? `quality=${this.config.IMAGE_QUALITY},` : '';
-                    CDN += this.config.IMAGE_GRAVITY ? `gravity=${this.config.IMAGE_GRAVITY},` : '';
-                    CDN += this.config.IMAGE_SHARPEN ? `sharpen=${this.config.IMAGE_SHARPEN},` : '';
-                    CDN += this.config.IMAGE_METADATA ? `metadata=${this.config.IMAGE_METADATA},` : '';
-                    CDN += `format=auto,onerror=redirect`;
-
-                    // Insert our CDN URL
-                    url = url.replace(rgxSrc, `$1${CDN}$2$3`);
-
-                    // Remove the sizes from the filename, pointing original image to Cloudflare for cropping
-                    url = url.replace(regexWidthAndHeightInFilename, '');
-                } else {
-                    // Extract width descriptor at the end, if filename did not contain dimensions
-                    match = width.match(regexWidthDescriptor);
-
-                    if (match) {
-                        let _width = match[1];
-
-                        // Base CDN
-                        let CDN = "/cdn-cgi/image/";
-                        CDN += `width=${_width},`;
-                        CDN += this.config.IMAGE_QUALITY ? `quality=${this.config.IMAGE_QUALITY},` : '';
-                        CDN += this.config.IMAGE_GRAVITY ? `gravity=${this.config.IMAGE_GRAVITY},` : '';
-                        CDN += this.config.IMAGE_SHARPEN ? `sharpen=${this.config.IMAGE_SHARPEN},` : '';
-                        CDN += this.config.IMAGE_METADATA ? `metadata=${this.config.IMAGE_METADATA},` : '';
-                        CDN += `format=auto,onerror=redirect`;
-
-                        // Insert our CDN URL
-                        url = url.replace(rgxSrc, `$1${CDN}$2$3`);
-                    } else {
-                        // Well, everything is fucked. But we still point the image to Cloudflare!!!
-
-                        // Base CDN
-                        let CDN = "/cdn-cgi/image/";
-                        CDN += this.config.IMAGE_QUALITY ? `quality=${this.config.IMAGE_QUALITY},` : '';
-                        CDN += this.config.IMAGE_GRAVITY ? `gravity=${this.config.IMAGE_GRAVITY},` : '';
-                        CDN += this.config.IMAGE_SHARPEN ? `sharpen=${this.config.IMAGE_SHARPEN},` : '';
-                        CDN += this.config.IMAGE_METADATA ? `metadata=${this.config.IMAGE_METADATA},` : '';
-                        CDN += `format=auto,onerror=redirect`;
-
-                        // Insert our CDN URL
-                        url = url.replace(rgxSrc, `$1${CDN}$2$3`);
-                    }
-                }
-
-                // Reconstruct the descriptor
-                return `${url} ${width}`;
-            });
-
-            // Join the modified descriptors back into a string
-            let modifiedSrcset = descriptors.join(', ');
-
-            element.setAttribute("data-lazy-srcset", modifiedSrcset);
-        }
-
         // Lazy load
         if (!element.hasAttribute("loading") && this.config.IMAGE_LAZY_LOAD === true) {
             element.setAttribute("loading", "lazy");
@@ -529,7 +270,8 @@ class ImageTagRewriter extends HTMLRewriter {
 }
 
 /**
- * Rewrites the <a> tags, mostly used by image viewers like lightbox
+ * Rewrite <a> tags, mostly used by image viewers like lightbox.
+ *
  * @author Mecanik
  * @version 2.0.0
  */
@@ -567,37 +309,7 @@ class HrefTagRewriter extends HTMLRewriter {
 }
 
 /**
- * Rewrites the <svg> tags, used to remove the empty svg's wordpress adds for duotone overlays
- * @author Mecanik
- * @version 2.0.0
- */
-class SvgTagRewriter extends HTMLRewriter {
-    constructor(config) {
-        super();
-        this.config = config;
-    }
-
-    async element(element) {
-        // If skip flag is true, exit early.
-        if (this.config.REWRITE_SVG_TAGS === false) {
-            console.debug(`SvgTagRewriter -> ${this.config.REWRITE_SVG_TAGS} (skipping)`);
-            return;
-        }
-
-        const viewBox = element.getAttribute("viewBox");
-        const _class = element.getAttribute("class");
-        const style = element.getAttribute("style");
-
-        // Remove: https://github.com/WordPress/gutenberg/issues/38299
-        // GG WP :)
-        if (viewBox && viewBox === "0 0 0 0" && !_class && style && style === "visibility: hidden; position: absolute; left: -9999px; overflow: hidden;") {
-            element.remove();
-        }
-    }
-}
-
-/**
- * Rewrites the <style> tags, used to replace image sources for inline CSS
+ * Rewrite <style> tags, used to replace image sources for inline CSS
  * @author Mecanik
  * @version 2.0.0
  */
@@ -658,7 +370,7 @@ class StyleTagRewriter extends HTMLRewriter {
 }
 
 /**
- * Rewrites the <div> tags, used to replace image sources for inline CSS, plugins and more
+ * Rewrite <div> tags, used to replace image sources for inline CSS, plugins and more
  * @author Mecanik
  * @version 2.0.0
  */
@@ -806,14 +518,14 @@ export default {
             hostname
         } = new URL(request.url);
 
-        // Do not rewrite images inside these paths (save some cost?)
+        // Do not rewrite images in WordPress admin or login pages
         if (pathname.indexOf("/wp-admin/") !== -1 || pathname.indexOf("/wp-login/") !== -1) {
-            console.error(`Bypassing page by path: ${pathname}`);
+            console.log(`Bypassing Cloudflare Image Resizing for path: ${pathname}`);
             return originResponse;
         }
 
         // If the content type is HTML, we will run the rewriter
-        // If running APO this is not returned once the page is cached on the Edge servers.
+        // If running Cloudflare's Automatic Platform Optimization for WordPress this is not returned, once the page is cached on the Edge servers.
         const contentType = originResponse.headers.get("content-type");
 
         if (contentType === null) {
@@ -830,13 +542,12 @@ export default {
                 .on('style', new StyleTagRewriter(currentConfig))
                 .on('img', new ImageTagRewriter(currentConfig))
                 .on('a', new HrefTagRewriter(currentConfig))
-                .on('svg', new SvgTagRewriter(currentConfig))
                 .on('div', new DivTagRewriter(currentConfig))
                 .transform(originResponse);
 
             return newResponse;
         }
-        // Trick or Treat? We replace images inside ALL CSS files you have :)
+        // Replace images inside all CSS files
         else if (contentType.startsWith("text/css")) {
             const domain = hostname.toLowerCase();
             const currentConfig = getConfigForDomain(domain);
