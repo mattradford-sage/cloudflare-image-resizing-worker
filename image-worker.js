@@ -1,7 +1,7 @@
 /**
  * Worker Name: CloudFlare Image Resizing
  * Worker URI: https://github.com/Mecanik/cloudflare-image-resizing-worker
- * Description: This worker will replace Image URL's so you can use the CloudFlare Image Resizing service.
+ * Description: This worker will replace Image URLs so you can use the CloudFlare Image Resizing service.
  * Version: 2.0.0
  * Author: Mecanik
  * Author URI: https://github.com/Mecanik/
@@ -61,15 +61,15 @@ const DEFAULT_CONFIG = {
     // Mode 'auto' selects focal point based on saliency detection (using maximum symmetric surround algorithm)
     IMAGE_GRAVITY: 'auto',
 
-    // Specifies strength of sharpening filter to apply to the image. 
-    // The value is a floating-point number between 0 (no sharpening, default) and 10 (maximum). 
+    // Specifies strength of sharpening filter to apply to the image.
+    // The value is a floating-point number between 0 (no sharpening, default) and 10 (maximum).
     // Note that 1 is a recommended value for downscaled images.
     // Range: 0 - 10
     IMAGE_SHARPEN: 1,
 
-    // Controls amount of invisible metadata (EXIF data) that should be preserved. Color profiles and EXIF rotation are applied to the image even if the metadata is discarded. 
+    // Controls amount of invisible metadata (EXIF data) that should be preserved. Color profiles and EXIF rotation are applied to the image even if the metadata is discarded.
     // Note that if the Polish feature is enabled, all metadata may have been removed already and this option will have no effect.
-    // Options: 'keep', 'copyright', 'none' 
+    // Options: 'keep', 'copyright', 'none'
     IMAGE_METADATA: 'none',
 };
 
@@ -167,7 +167,7 @@ class ImageTagRewriter extends HTMLRewriter {
                     if (parts.length !== 2)
                         return descriptor;
 
-                    // This should return us 2 parts: ["https://....Image-300x200.jpg", "300w"] 
+                    // This should return us 2 parts: ["https://....Image-300x200.jpg", "300w"]
                     let url = parts[0];
                     let width = parts[1];
 
@@ -314,7 +314,7 @@ class ImageTagRewriter extends HTMLRewriter {
                 if (parts.length !== 2)
                     return descriptor;
 
-                // This should return us 2 parts: ["https://....Image-300x200.jpg", "300w"] 
+                // This should return us 2 parts: ["https://....Image-300x200.jpg", "300w"]
                 let url = parts[0];
                 let width = parts[1];
 
@@ -449,7 +449,7 @@ class ImageTagRewriter extends HTMLRewriter {
                 if (parts.length !== 2)
                     return descriptor;
 
-                // This should return us 2 parts: ["https://....Image-300x200.jpg", "300w"] 
+                // This should return us 2 parts: ["https://....Image-300x200.jpg", "300w"]
                 let url = parts[0];
                 let width = parts[1];
 
@@ -567,7 +567,7 @@ class HrefTagRewriter extends HTMLRewriter {
 }
 
 /**
- * Rewrites the <svg> tags, used to remove the empty svg's wordpress adds for no reason
+ * Rewrites the <svg> tags, used to remove the empty svg's wordpress adds for duotone overlays
  * @author Mecanik
  * @version 2.0.0
  */
@@ -589,7 +589,7 @@ class SvgTagRewriter extends HTMLRewriter {
         const style = element.getAttribute("style");
 
         // Remove: https://github.com/WordPress/gutenberg/issues/38299
-        // GG WP :)		
+        // GG WP :)
         if (viewBox && viewBox === "0 0 0 0" && !_class && style && style === "visibility: hidden; position: absolute; left: -9999px; overflow: hidden;") {
             element.remove();
         }
@@ -621,7 +621,7 @@ class StyleTagRewriter extends HTMLRewriter {
             console.debug(`StyleTagRewriter -> WP Admin Bar CSS (skipping)`);
             return;
         }
-		
+
         // Buffering the text content
         this.buffer += inlineCSS.text;
 
